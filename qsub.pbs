@@ -1,0 +1,16 @@
+#!/bin/sh
+
+#PBS -q dgx
+#PBS -l select=1:ncpus=5:ngpus=1
+#PBS -l walltime=12:00:00
+#PBS -P 11001764
+#PBS -N msmt
+#PBS -o ./pbs.log
+#PBS -e ./pbs-e.log
+
+
+image="nvcr.io/nvidia/cuda:10.1-cudnn7-devel-ubuntu18.04"
+
+
+cd /home/projects/11001764/wenjuan/multisourceMT
+nscc-docker run $image < ./run.sh > ./out.log 2> ./err.log
