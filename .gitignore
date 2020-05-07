@@ -8,3 +8,7 @@ venv/
 wmt14_3/
 *.log
 *.pyc
+*.pickle
+checkpoints/
+checkpoints1/
+checkpoints4/

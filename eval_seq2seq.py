@@ -70,9 +70,9 @@ def main():
     args_parser.add_argument('--model_path', help='path for saving model file.', default='models/temp')
     args_parser.add_argument('--model_name', help='name for saving model file.', default='generator')
 
-    args_parser.add_argument('--seq2seq_save_path', default='checkpoints/seq2seq_save_model', type=str,
+    args_parser.add_argument('--seq2seq_save_path', default='checkpoints1/seq2seq_save_model', type=str,
                              help='seq2seq_save_path')
-    args_parser.add_argument('--seq2seq_load_path', default='checkpoints/seq2seq_save_model', type=str,
+    args_parser.add_argument('--seq2seq_load_path', default='checkpoints1/seq2seq_save_model', type=str,
                              help='seq2seq_load_path')
     # args_parser.add_argument('--rl_finetune_seq2seq_save_path', default='models/rl_finetune/seq2seq_save_model',
     #                          type=str, help='rl_finetune_seq2seq_save_path')
@@ -110,7 +110,7 @@ def main():
     print('begin loading training data-----')
     # print('time: ', time.asctime( time.localtime(time.time()) ))
     seq2seq_train_data = MultiSourceTranslationDataset(
-        path='wmt14_3/50_train', exts=('.de', '.fr', '.en'),
+        path='wmt14_3/sample', exts=('.de', '.fr', '.en'),
 
         fields=(de_field, fr_field, en_field))
     print('begin loading validation data-----')
@@ -169,7 +169,7 @@ def main():
     parameters_need_update = filter(lambda p: p.requires_grad, seq2seq.parameters())
     optim_seq2seq = torch.optim.Adam(parameters_need_update, lr=0.0003)
 
-    # seq2seq.load_state_dict(torch.load(args.seq2seq_load_path +'_batch_'+ str(141500) + '.pt'))  # TODO: 10.7
+    seq2seq.load_state_dict(torch.load(args.seq2seq_load_path +'_batch_'+ str(2000000) + '.pt'))  # TODO: 10.7
     # torch.save(seq2seq.state_dict(), args.seq2seq_save_path +'_batch_'+ str(ii) + '.pt')
     seq2seq.to(device)
 
@@ -180,98 +180,39 @@ def main():
     PAD_IDX = en_field.vocab.stoi['<pad>']
     # criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
     ii=0#141500
-    for i in range(EPOCHS):
-        ls_seq2seq_ep = 0
-        seq2seq.train()
-        # seq2seq.emb.weight.requires_grad = False
-        print('----------' + str(i) + ' iter----------')
-        for _, batch in enumerate(train_iter):
-            # print(ii)
-            seq2seq.train()
+ 
+    if True:  # i%1 == 0:
+        seq2seq.eval()
+        bleu_ep = 0
+        acc_numerator_ep = 0
+        acc_denominator_ep = 0
+        testi = 0
+        for _, batch in enumerate(dev_iter):  # for _ in range(1, num_batches + 1):  word, char, pos, heads, types, masks, lengths = conllx_data.get_batch_tensor(data_dev, batch_size, unk_replace=unk_replace)  # word:(32,50)  char:(32,50,35)
             src1, lengths_src1 = batch.src1  # word:(32,50)  150,64
             src2, lengths_src2 = batch.src2  # word:(32,50)  150,64
             trg, lengths_trg = batch.trg
+            sel, _ = seq2seq(src1.long().to(device), src2.long().to(device), LEN=max(src1.size()[1], src2.size()[1]))  # TODO:
+            sel = sel.detach().cpu().numpy()
+            dec_out = trg.cpu().numpy()
 
-            # max_len1 = src1.size()[1]  # batch_first
-            # masks1 = torch.arange(max_len1).expand(len(lengths_src1), max_len1) < lengths_src1.unsqueeze(1)
-            # masks1 = masks1.long()
-            # max_len2 = src2.size()[1]  # batch_first
-            # masks2 = torch.arange(max_len2).expand(len(lengths_src2), max_len2) < lengths_src2.unsqueeze(1)
-            # masks2 = masks2.long()
-            dec_out = trg
-            dec_inp = torch.cat((trg[:, -2:-1], trg[:, 0:-1]), dim=1)  # maybe wrong
-            # train_seq2seq
-            out = seq2seq(src1.long().to(device), src2.long().to(device), is_tr=True, dec_inp=dec_inp.long().to(device))
-
-            out = out.view((out.shape[0] * out.shape[1], out.shape[2]))
-            dec_out = dec_out.view((dec_out.shape[0] * dec_out.shape[1],))
-
-            # max_len_trg = trg.size()[1]  # batch_first
-            # masks_trg = torch.arange(max_len_trg).expand(len(lengths_trg), max_len_trg) < lengths_trg.unsqueeze(1)
-            # masks_trg = masks_trg.float().to(device)
-            # wgt = masks_trg.view(-1)
-            # wgt = seq2seq.add_stop_token(masks, lengths_src)  # TODO
-            # wgt = wgt.view((wgt.shape[0] * wgt.shape[1],)).float().to(device)
-            # wgt = masks.view(-1)
-
-            ls_seq2seq_bh = loss_seq2seq(out, dec_out.long().to(device))  # 9600, 8133
-            # ls_seq2seq_bh = (ls_seq2seq_bh * wgt).sum() / wgt.sum()  # TODO
-            ls_seq2seq_bh = ls_seq2seq_bh.sum() / ls_seq2seq_bh.numel()
-
-            optim_seq2seq.zero_grad()
-            ls_seq2seq_bh.backward()
-            optim_seq2seq.step()
-
-            ls_seq2seq_bh = ls_seq2seq_bh.cpu().detach().numpy()
-            ls_seq2seq_ep += ls_seq2seq_bh
-        # print('ls_seq2seq_ep: ', ls_seq2seq_ep)
-        # for pg in optim_seq2seq.param_groups:
-        #     pg['lr'] *= DECAY
-
-        # test th bleu of seq2seq
-        # if i>40:
-        #     print('ss')
-            ii = ii + 1
-            if ii%100000==0:
-                if True:  # i%1 == 0:
-                    seq2seq.eval()
-                    bleu_ep = 0
-                    acc_numerator_ep = 0
-                    acc_denominator_ep = 0
-                    testi = 0
-                    for _, batch in enumerate(dev_iter):  # for _ in range(1, num_batches + 1):  word, char, pos, heads, types, masks, lengths = conllx_data.get_batch_tensor(data_dev, batch_size, unk_replace=unk_replace)  # word:(32,50)  char:(32,50,35)
-                        src1, lengths_src1 = batch.src1  # word:(32,50)  150,64
-                        src2, lengths_src2 = batch.src2  # word:(32,50)  150,64
-                        trg, lengths_trg = batch.trg
-                        sel, _ = seq2seq(src1.long().to(device), src2.long().to(device), LEN=max(src1.size()[1], src2.size()[1]))  # TODO:
-                        sel = sel.detach().cpu().numpy()
-                        dec_out = trg.cpu().numpy()
-
-                        bleus = []
+            bleus = []
 
 
-                        for j in range(sel.shape[0]):
-                            bleu = get_bleu(sel[j], dec_out[j], num_words_en)  # sel
-                            bleus.append(bleu)
-                            numerator, denominator = get_correct(sel[j], dec_out[j], num_words_en)
-                            acc_numerator_ep += numerator
-                            acc_denominator_ep += denominator  # .detach().cpu().numpy() TODO: 10.8
-                        bleu_bh = np.average(bleus)
-                        bleu_ep += bleu_bh
-                        testi += 1
-                    bleu_ep /= testi  # num_batches
-                    print('testi: ', testi)
-                    print('Valid bleu: %.4f%%' % (bleu_ep * 100))
-                    # print(acc_denominator_ep)
-                    if acc_denominator_ep > 0:
-                        print('Valid acc: %.4f%%' % ((acc_numerator_ep * 1.0 / acc_denominator_ep) * 100))
-                # for debug TODO:
-                # if i%1 == 0:
-                    torch.save(seq2seq.state_dict(), args.seq2seq_save_path +'_batch_'+ str(ii) + '.pt')
-        print('ls_seq2seq_ep: ', ls_seq2seq_ep)
-        for pg in optim_seq2seq.param_groups:
-            pg['lr'] *= DECAY
-
+            for j in range(sel.shape[0]):
+                bleu = get_bleu(sel[j], dec_out[j], num_words_en)  # sel
+                bleus.append(bleu)
+                numerator, denominator = get_correct(sel[j], dec_out[j], num_words_en)
+                acc_numerator_ep += numerator
+                acc_denominator_ep += denominator  # .detach().cpu().numpy() TODO: 10.8
+            bleu_bh = np.average(bleus)
+            bleu_ep += bleu_bh
+            testi += 1
+        bleu_ep /= testi  # num_batches
+        print('testi: ', testi)
+        print('Valid bleu: %.4f%%' % (bleu_ep * 100))
+        # print(acc_denominator_ep)
+        if acc_denominator_ep > 0:
+            print('Valid acc: %.4f%%' % ((acc_numerator_ep * 1.0 / acc_denominator_ep) * 100))
 
 
 if __name__ == '__main__':

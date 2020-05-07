@@ -41,18 +41,19 @@ def get_correct(out, dec_out, num_words):
         cnd = out
 
     if stop_token in dec_out:
-        ref = [dec_out[:dec_out.index(stop_token)]]
+        ref = dec_out[:dec_out.index(stop_token)]  # TODO: hanwj
     else:
-        ref = [dec_out]
-    tmp = [1 if cnd[i] == ref[i] else 0 for i in range(1, min(len(cnd), len(ref)))]
+        ref = dec_out
+    tmp = [1 if cnd[i] == ref[i] else 0 for i in range(0, min(len(cnd), len(ref)))]
     if not tmp:
         stc_crt = 0
     else:
         stc_crt = sum(tmp)
     if not max(len(cnd), len(ref)) - 1>0:
-        print(max(len(cnd), len(ref)))
+        pass  # TODO: hanwj
+        #print(max(len(cnd), len(ref)))
     # assert max(len(cnd), len(ref)) - 1>0
-    return stc_crt, max(len(cnd), len(ref))-1
+    return stc_crt, max(len(cnd), len(ref))
 
 class Seq2seq_Model(nn.Module):
     def __init__(self, EMB=8, HID=64, DPr=0.5, vocab_size1=None, vocab_size2=None, vocab_size3=None, word_embedd=None, device=None):
@@ -91,7 +92,8 @@ class Seq2seq_Model(nn.Module):
             self.dec = nn.LSTM(self.EMB, self.HID,  # because of bidirection
                                batch_first=True, num_layers=self.num_layers)
             self.att = nn.Parameter(torch.FloatTensor(self.HID, self.HID))
-            self.fc = nn.Linear(self.HID * 2, self.vocab_size3)  # self.vocab_size + 2
+            # self.fc = nn.Linear(self.HID * 2, self.vocab_size3)  # self.vocab_size + 2
+            self.fc = nn.Linear(self.HID, self.vocab_size3)  # self.vocab_size + 2
 
         self.init()
 
@@ -99,18 +101,22 @@ class Seq2seq_Model(nn.Module):
         stdv = 1 / math.sqrt(self.HID * 2)
         self.att.data.uniform_(-stdv, stdv)
 
-    def run_dec(self, dec_inp, out_enc1, h1, out_enc2, h2):
+    def run_dec(self, dec_inp, out_enc1, h1, out_enc2, h2, istrain=False):
         dec_inp = self.emb3(dec_inp)
-        h_1 = torch.tanh(self.cat1(torch.cat((h1[0], h2[0]), dim=2)))
-        h_2 = h1[1] + h2[1] #self.cat2(torch.cat((h1[1], h2[1]), dim=2))
-        out_dec, h = self.dec(dec_inp, (h_1, h_2))  # 1 20 512
+        if istrain or isinstance(h1, tuple):
+            h_1 = torch.tanh(self.cat1(torch.cat((h1[0], h2[0]), dim=2)))
+            h_2 = h1[1] + h2[1] #self.cat2(torch.cat((h1[1], h2[1]), dim=2))
+            out_dec, h = self.dec(dec_inp, (h_1, h_2))  # 1 20 512
+        else:
+            out_dec, h = self.dec(dec_inp, (h1, h2))
         out_dec = self.DP(out_dec)
-        out_enc = self.cat3(torch.cat((out_enc1, out_enc2), dim=2))
-        att_wgt = nn.functional.softmax(torch.bmm(torch.matmul(out_dec, self.att), out_enc.transpose(1, 2)), dim=2)
-        att_cxt = torch.bmm(att_wgt, out_enc)  #out_dec 20 150 512
+        # out_enc = self.cat3(torch.cat((out_enc1, out_enc2), dim=2))
+        # att_wgt = nn.functional.softmax(torch.bmm(torch.matmul(out_dec, self.att), out_enc.transpose(1, 2)), dim=2)
+        # att_cxt = torch.bmm(att_wgt, out_enc)  #out_dec 20 150 512
+        # out = torch.cat([out_dec, att_cxt], dim=2)
+        # out = self.fc(out)
 
-        out = torch.cat([out_dec, att_cxt], dim=2)
-        out = self.fc(out)
+        out = self.fc(out_dec)
 
         return out, h
 
@@ -147,14 +153,15 @@ class Seq2seq_Model(nn.Module):
 
         # if it is LSTM, output h is (h,c)
         if not dec_inp is None:  # train
-            out, _ = self.run_dec(dec_inp, out_enc1, h1, out_enc2, h2)
+            out, _ = self.run_dec(dec_inp, out_enc1, h1, out_enc2, h2, istrain=True)
             return out
         else: # test
             # dec_inp = torch.ones((inp.shape[0], 1)).long().cuda() * 2  # id of start: self.vocab_size # START [50,1]
-            dec_inp = torch.ones((inp1.shape[0], 1)).long().to(self.device) * 2  # id of start: self.vocab_size # START [50,1]
+            dec_inp = torch.ones((inp1.shape[0], 1)).long().to(self.device) #* 2  # id of start: self.vocab_size # START [50,1]
             outs, sels, pbs = [], [], []
             for ii in range(LEN):
                 out, h = self.run_dec(dec_inp, out_enc1, h1, out_enc2, h2)  #(200, 1) (200,30,128) (1, 200, 128)  ||(200,1) (200, 15, 128) (1, 200, 128)
+                h1, h2 = h
                 outs.append(out)
                 dec_inp = torch.argmax(out, dim=2, keepdim=False)
                 sels.append(dec_inp)  # dec_inp: [200, 1]
