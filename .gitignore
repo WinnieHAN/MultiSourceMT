@@ -12,3 +12,9 @@ wmt14_3/
 checkpoints/
 checkpoints1/
 checkpoints4/
+checkpoint3to1_0/
+checkpoints2/
+checkpoints5/
+gec_data/
+temp_lstm.zip
+test.predict.out

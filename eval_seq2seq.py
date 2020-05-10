@@ -70,9 +70,9 @@ def main():
     args_parser.add_argument('--model_path', help='path for saving model file.', default='models/temp')
     args_parser.add_argument('--model_name', help='name for saving model file.', default='generator')
 
-    args_parser.add_argument('--seq2seq_save_path', default='checkpoints1/seq2seq_save_model', type=str,
+    args_parser.add_argument('--seq2seq_save_path', default='checkpoints4/seq2seq_save_model', type=str,
                              help='seq2seq_save_path')
-    args_parser.add_argument('--seq2seq_load_path', default='checkpoints1/seq2seq_save_model', type=str,
+    args_parser.add_argument('--seq2seq_load_path', default='checkpoints4/seq2seq_save_model', type=str,
                              help='seq2seq_load_path')
     # args_parser.add_argument('--rl_finetune_seq2seq_save_path', default='models/rl_finetune/seq2seq_save_model',
     #                          type=str, help='rl_finetune_seq2seq_save_path')

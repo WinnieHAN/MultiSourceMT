@@ -70,9 +70,9 @@ def main():
     args_parser.add_argument('--model_path', help='path for saving model file.', default='models/temp')
     args_parser.add_argument('--model_name', help='name for saving model file.', default='generator')
 
-    args_parser.add_argument('--seq2seq_save_path', default='checkpoints/seq2seq_save_model', type=str,
+    args_parser.add_argument('--seq2seq_save_path', default='checkpoint3to1/model', type=str,
                              help='seq2seq_save_path')
-    args_parser.add_argument('--seq2seq_load_path', default='checkpoints1/seq2seq_save_model', type=str,
+    args_parser.add_argument('--seq2seq_load_path', default='checkpoint3to1/model', type=str,
                              help='seq2seq_load_path')
     # args_parser.add_argument('--rl_finetune_seq2seq_save_path', default='models/rl_finetune/seq2seq_save_model',
     #                          type=str, help='rl_finetune_seq2seq_save_path')
@@ -87,8 +87,8 @@ def main():
     args = args_parser.parse_args()
 
     spacy_en = spacy.load('en_core_web_sm')  # python -m spacy download en
-    spacy_de = spacy.load('de_core_news_sm')  # python -m spacy download en
-    spacy_fr = spacy.load('fr_core_news_sm')  # python -m spacy download en
+    # spacy_de = spacy.load('de_core_news_sm')  # python -m spacy download en
+    # spacy_fr = spacy.load('fr_core_news_sm')  # python -m spacy download en
 
     SEED = 0
     random.seed(SEED)
@@ -99,59 +99,59 @@ def main():
 
     def tokenizer_en(text):  # create a tokenizer function
         return [tok.text for tok in spacy_en.tokenizer(text)]
-    def tokenizer_de(text):  # create a tokenizer function
-        return [tok.text for tok in spacy_de.tokenizer(text)]
-    def tokenizer_fr(text):  # create a tokenizer function
-        return [tok.text for tok in spacy_fr.tokenizer(text)]
+    # def tokenizer_de(text):  # create a tokenizer function
+        # return [tok.text for tok in spacy_de.tokenizer(text)]
+    # def tokenizer_fr(text):  # create a tokenizer function
+        # return [tok.text for tok in spacy_fr.tokenizer(text)]
 
-    en_field = data.Field(sequential=True, tokenize=tokenizer_en, lower=True, include_lengths=True, batch_first=True)  #use_vocab=False fix_length=10
-    de_field = data.Field(sequential=True, tokenize=tokenizer_de, lower=True, include_lengths=True, batch_first=True)  #use_vocab=False
-    fr_field = data.Field(sequential=True, tokenize=tokenizer_fr, lower=True, include_lengths=True, batch_first=True)  #use_vocab=False
+    en_field = data.Field(sequential=True, tokenize=tokenizer_en, lower=False, include_lengths=True, batch_first=True, eos_token='<eos>')  # lower=True use_vocab=False fix_length=10
+    # de_field = data.Field(sequential=True, tokenize=tokenizer_de, lower=True, include_lengths=True, batch_first=True)  #use_vocab=False
+    # fr_field = data.Field(sequential=True, tokenize=tokenizer_fr, lower=True, include_lengths=True, batch_first=True)  #use_vocab=False
     print('begin loading training data-----')
     # print('time: ', time.asctime( time.localtime(time.time()) ))
     seq2seq_train_data = MultiSourceTranslationDataset(
-        path='wmt14_3/50_train', exts=('.de', '.fr', '.en'),
+        path='gec_data/st19-train-20.tok', exts=('.out1', '.out2', '.trg'),  # st19-train-20.tok
 
-        fields=(de_field, fr_field, en_field))
+        fields=(en_field, en_field, en_field))
     print('begin loading validation data-----')
     # print('time: ', time.asctime( time.localtime(time.time()) ))
     seq2seq_dev_data = MultiSourceTranslationDataset(
-        path='wmt14_3/test', exts=('.de', '.fr', '.en'),
-        fields=(de_field, fr_field, en_field))
+        path='gec_data/wilocABCN-test.tok', exts=('.out1', '.out2', '.out3'), #wilocABCN-test.tok
+        fields=(en_field, en_field, en_field))
     print('end loading data-----')
-    # print('time: ', time.asctime( time.localtime(time.time()) ))
+    print('time: ', time.asctime( time.localtime(time.time()) ))
 
     # en_train_data = datasets.TranslationDataset(path='wmt14_3/sample', exts=('.en', '.en'), fields=(en_field, en_field))
-    # print('end en data-----')
-    # print('time: ', time.asctime( time.localtime(time.time()) ))
+    print('end en data-----')
+    print('time: ', time.asctime( time.localtime(time.time()) ))
     # de_train_data = datasets.TranslationDataset(path='wmt14_3/sample', exts=('.de', '.de'), fields=(de_field, de_field))
     # fr_train_data = datasets.TranslationDataset(path='wmt14_3/sample', exts=('.fr', '.fr'), fields=(fr_field, fr_field))
-    # en_field.build_vocab(en_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
+    en_field.build_vocab(seq2seq_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
     # de_field.build_vocab(de_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
     # fr_field.build_vocab(fr_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
-    # vocab_thread = 20000+2
-    # with open(str(vocab_thread)+'_vocab_en.pickle', 'rb') as f:
-    #     en_field.vocab = pickle.load(f)
+    vocab_thread = 80000+2
+    with open(str(vocab_thread)+'_vocab_en_2single.pickle', 'wb') as f:
+        pickle.dump(en_field.vocab, f)
     # with open(str(vocab_thread)+'_vocab_de.pickle', 'rb') as f:
     #     de_field.vocab = pickle.load(f)
     # with open(str(vocab_thread)+'_vocab_fr.pickle', 'rb') as f:
     #     fr_field.vocab = pickle.load(f)
-    with open('vocab_en.pickle', 'rb') as f:
-        en_field.vocab = pickle.load(f)
-    with open('vocab_de.pickle', 'rb') as f:
-        de_field.vocab = pickle.load(f)
-    with open('vocab_fr.pickle', 'rb') as f:
-        fr_field.vocab = pickle.load(f)
+    # with open('vocab_en.pickle', 'rb') as f:
+    #     en_field.vocab = pickle.load(f)
+    # with open('vocab_de.pickle', 'rb') as f:
+    #     de_field.vocab = pickle.load(f)
+    # with open('vocab_fr.pickle', 'rb') as f:
+    #     fr_field.vocab = pickle.load(f)
     print('end build vocab-----')
-    # print('time: ', time.asctime( time.localtime(time.time()) ))
+    print('time: ', time.asctime( time.localtime(time.time()) ))
     # trg_field.build_vocab(seq2seq_train_data, max_size=80000)
     # mt_dev shares the fields, so it shares their vocab objects
 
     train_iter = data.BucketIterator(
-        dataset=seq2seq_train_data, batch_size=10,
+        dataset=seq2seq_train_data, batch_size=16,
         sort_key=lambda x: data.interleave_keys(len(x.src), len(x.trg)), device=device, shuffle=True)  # Note that if you are runing on CPU, you must set device to be -1, otherwise you can leave it to 0 for GPU.
     dev_iter = data.BucketIterator(
-        dataset=seq2seq_dev_data, batch_size=10,
+        dataset=seq2seq_dev_data, batch_size=16,
         sort_key=lambda x: data.interleave_keys(len(x.src), len(x.trg)), device=device, shuffle=False)
 
     num_words_en = len(en_field.vocab.stoi)
@@ -161,7 +161,7 @@ def main():
     DECAY = 0.97
     # TODO: #len(en_field.vocab.stoi)  # ?? word_embedd ??
     word_dim = 300  # ??
-    seq2seq = Seq2seq_Model(EMB=word_dim, HID=args.hidden_size, DPr=0.5, vocab_size1=len(de_field.vocab.stoi), vocab_size2=len(fr_field.vocab.stoi), vocab_size3=len(en_field.vocab.stoi), word_embedd=None, device=device).to(device)  # TODO: random init vocab
+    seq2seq = Seq2seq_Model(EMB=word_dim, HID=args.hidden_size, DPr=0.5, vocab_size1=len(en_field.vocab.stoi), vocab_size2=len(en_field.vocab.stoi), vocab_size3=len(en_field.vocab.stoi), word_embedd=None, device=device, share_emb=True).to(device)  # TODO: random init vocab
     # seq2seq.emb.weight.requires_grad = False
     print(seq2seq)
 
@@ -169,7 +169,7 @@ def main():
     parameters_need_update = filter(lambda p: p.requires_grad, seq2seq.parameters())
     optim_seq2seq = torch.optim.Adam(parameters_need_update, lr=0.0003)
 
-    seq2seq.load_state_dict(torch.load(args.seq2seq_load_path +'_batch_'+ str(1000000) + '.pt'))  # TODO: 10.7
+    # seq2seq.load_state_dict(torch.load(args.seq2seq_load_path +'_batch_'+ str(555001) + '.pt'))  # TODO: 10.7
     # torch.save(seq2seq.state_dict(), args.seq2seq_save_path +'_batch_'+ str(ii) + '.pt')
     seq2seq.to(device)
 
@@ -178,8 +178,9 @@ def main():
 
     print(f'The model has {count_parameters(seq2seq):,} trainable parameters')
     PAD_IDX = en_field.vocab.stoi['<pad>']
+    EOS_IDX = en_field.vocab.stoi['<eos>']
     # criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
-    ii=1000000#141500
+    ii=0
     for i in range(EPOCHS):
         ls_seq2seq_ep = 0
         seq2seq.train()
@@ -232,7 +233,7 @@ def main():
         # if i>40:
         #     print('ss')
             ii = ii + 1
-            if ii%500000==1:
+            if ii%100000==1:
                 if True:  # i%1 == 0:
                     seq2seq.eval()
                     bleu_ep = 0
@@ -243,7 +244,7 @@ def main():
                         src1, lengths_src1 = batch.src1  # word:(32,50)  150,64
                         src2, lengths_src2 = batch.src2  # word:(32,50)  150,64
                         trg, lengths_trg = batch.trg
-                        sel, _ = seq2seq(src1.long().to(device), src2.long().to(device), LEN=max(src1.size()[1], src2.size()[1]))  # TODO:
+                        sel, _ = seq2seq(src1.long().to(device), src2.long().to(device), LEN=5+max(src1.size()[1], src2.size()[1]))  # TODO:
                         sel = sel.detach().cpu().numpy()
                         dec_out = trg.cpu().numpy()
 
@@ -251,9 +252,9 @@ def main():
 
 
                         for j in range(sel.shape[0]):
-                            bleu = get_bleu(sel[j], dec_out[j], num_words_en)  # sel
+                            bleu = get_bleu(sel[j], dec_out[j], EOS_IDX)  # sel
                             bleus.append(bleu)
-                            numerator, denominator = get_correct(sel[j], dec_out[j], num_words_en)
+                            numerator, denominator = get_correct(sel[j], dec_out[j], EOS_IDX)
                             acc_numerator_ep += numerator
                             acc_denominator_ep += denominator  # .detach().cpu().numpy() TODO: 10.8
                         bleu_bh = np.average(bleus)

@@ -13,10 +13,10 @@ from nltk.translate.bleu_score import sentence_bleu as BLEU
 # print('BLEU: %.4f%%' % (bleu * 100))
 
 
-def get_bleu(out, dec_out, vocab_size):
+def get_bleu(out, dec_out, EOS_IDX):
     out = out.tolist()
     dec_out = dec_out.tolist()
-    stop_token = 1
+    stop_token = EOS_IDX
     if stop_token in out:
         cnd = out[:out.index(stop_token)]
     else:
@@ -31,10 +31,10 @@ def get_bleu(out, dec_out, vocab_size):
 
     return bleu
 
-def get_correct(out, dec_out, num_words):
+def get_correct(out, dec_out, EOS_IDX):
     out = out.tolist()
     dec_out = dec_out.tolist()
-    stop_token = 1
+    stop_token = EOS_IDX
     if stop_token in out:
         cnd = out[:out.index(stop_token)]
     else:
@@ -56,7 +56,7 @@ def get_correct(out, dec_out, num_words):
     return stc_crt, max(len(cnd), len(ref))
 
 class Seq2seq_Model(nn.Module):
-    def __init__(self, EMB=8, HID=64, DPr=0.5, vocab_size1=None, vocab_size2=None, vocab_size3=None, word_embedd=None, device=None):
+    def __init__(self, EMB=8, HID=64, DPr=0.5, vocab_size1=None, vocab_size2=None, vocab_size3=None, word_embedd=None, device=None, share_emb=False):
         super(Seq2seq_Model, self).__init__()
 
         self.vocab_size1 = vocab_size1
@@ -67,10 +67,14 @@ class Seq2seq_Model(nn.Module):
         self.DP = nn.Dropout(DPr)
         self.num_layers = 4
         self.device = device
-
-        self.emb1 = nn.Embedding(self.vocab_size1 + 2, self.EMB)
-        self.emb2 = nn.Embedding(self.vocab_size2 + 2, self.EMB)
-        self.emb3 = nn.Embedding(self.vocab_size3 + 2, self.EMB)
+        if share_emb:
+            self.emb1 = nn.Embedding(self.vocab_size1 + 2, self.EMB)
+            self.emb2 = self.emb1
+            self.emb3 = self.emb1
+        else:
+            self.emb1 = nn.Embedding(self.vocab_size1 + 2, self.EMB)
+            self.emb2 = nn.Embedding(self.vocab_size2 + 2, self.EMB)
+            self.emb3 = nn.Embedding(self.vocab_size3 + 2, self.EMB)
 
         self.bidirectional=False
         self.enc = nn.LSTM(self.EMB, self.HID,  # GRU
