@@ -199,7 +199,7 @@ def main():
             # masks2 = torch.arange(max_len2).expand(len(lengths_src2), max_len2) < lengths_src2.unsqueeze(1)
             # masks2 = masks2.long()
             dec_out = trg
-            dec_inp = torch.cat((trg[:, -2:-1], trg[:, 0:-1]), dim=1)  # maybe wrong
+            dec_inp = torch.cat((trg[:, -2:-1], trg[:, 0:-1]), dim=1)  # maybe wrong TODO:  hanwj
             # train_seq2seq
             out = seq2seq(src1.long().to(device), src2.long().to(device), is_tr=True, dec_inp=dec_inp.long().to(device))
 

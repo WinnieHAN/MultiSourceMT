@@ -95,7 +95,7 @@ def main():
     np.random.seed(SEED)
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
-    device = torch.device('cuda') #torch.device('cuda' if torch.cuda.is_available() else 'cpu') #'cpu' if not torch.cuda.is_available() else 'cuda:0'
+    device = torch.device('cuda:0') #torch.device('cuda' if torch.cuda.is_available() else 'cpu') #'cpu' if not torch.cuda.is_available() else 'cuda:0'
 
     def tokenizer_en(text):  # create a tokenizer function
         return [tok.text for tok in spacy_en.tokenizer(text)]
@@ -129,7 +129,7 @@ def main():
     en_field.build_vocab(seq2seq_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
     # de_field.build_vocab(de_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
     # fr_field.build_vocab(fr_train_data, max_size=80000)  # ,vectors="glove.6B.100d"
-    vocab_thread = 80000+2
+    vocab_thread = 80000+3
     with open(str(vocab_thread)+'_vocab_en_2single.pickle', 'wb') as f:
         pickle.dump(en_field.vocab, f)
     # with open(str(vocab_thread)+'_vocab_de.pickle', 'rb') as f:
@@ -160,7 +160,7 @@ def main():
     EPOCHS = 100  # 150
     DECAY = 0.97
     # TODO: #len(en_field.vocab.stoi)  # ?? word_embedd ??
-    word_dim = 300  # ??
+    word_dim = 100 #300  # ??
     seq2seq = Seq2seq_Model(EMB=word_dim, HID=args.hidden_size, DPr=0.5, vocab_size1=len(en_field.vocab.stoi), vocab_size2=len(en_field.vocab.stoi), vocab_size3=len(en_field.vocab.stoi), word_embedd=None, device=device, share_emb=True).to(device)  # TODO: random init vocab
     # seq2seq.emb.weight.requires_grad = False
     print(seq2seq)
@@ -192,7 +192,7 @@ def main():
             src1, lengths_src1 = batch.src1  # word:(32,50)  150,64
             src2, lengths_src2 = batch.src2  # word:(32,50)  150,64
             trg, lengths_trg = batch.trg
-
+            batch_size = src1.size()[0]
             # max_len1 = src1.size()[1]  # batch_first
             # masks1 = torch.arange(max_len1).expand(len(lengths_src1), max_len1) < lengths_src1.unsqueeze(1)
             # masks1 = masks1.long()
@@ -200,7 +200,7 @@ def main():
             # masks2 = torch.arange(max_len2).expand(len(lengths_src2), max_len2) < lengths_src2.unsqueeze(1)
             # masks2 = masks2.long()
             dec_out = trg
-            dec_inp = torch.cat((trg[:, -2:-1], trg[:, 0:-1]), dim=1)  # maybe wrong
+            dec_inp = torch.cat((torch.ones(size=[batch_size,1]).long().to(device), trg[:, 0:-1]), dim=1)  # maybe wrong  torch.cat((trg[:, -2:-1], trg[:, 0:-1]), dim=1)
             # train_seq2seq
             out = seq2seq(src1.long().to(device), src2.long().to(device), is_tr=True, dec_inp=dec_inp.long().to(device))
 
@@ -231,9 +231,8 @@ def main():
 
         # test th bleu of seq2seq
         # if i>40:
-        #     print('ss')
-            ii = ii + 1
-            if ii%100000==1:
+        #     print('ss')   
+            if ii%100000==0:
                 if True:  # i%1 == 0:
                     seq2seq.eval()
                     bleu_ep = 0
@@ -269,6 +268,7 @@ def main():
                 # for debug TODO:
                 # if i%1 == 0:
                     torch.save(seq2seq.state_dict(), args.seq2seq_save_path +'_batch_'+ str(ii) + '.pt')
+            ii = ii + 1
         print('ls_seq2seq_ep: ', ls_seq2seq_ep)
         for pg in optim_seq2seq.param_groups:
             pg['lr'] *= DECAY

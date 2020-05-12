@@ -18,3 +18,6 @@ checkpoints5/
 gec_data/
 temp_lstm.zip
 test.predict.out
+checkpoint3to1/
+checkpoints4_mt_final/
+log.log.1
